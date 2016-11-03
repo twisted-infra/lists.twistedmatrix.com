@@ -5,6 +5,6 @@ chmod a+x ./carina
 curl -sL https://download.getcarina.com/dvm/latest/install.sh | sh
 source ~/.dvm/dvm.sh
 ./carina credentials lists
-. ~/.carina/clusters/"${CARINA_USERNAME}"/"${clustername}"/docker.env;
+. ~/.carina/clusters/"${CARINA_USERNAME}"/lists/docker.env;
 dvm use;
 docker ps;
