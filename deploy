@@ -1,0 +1,10 @@
+#!/bin/bash
+
+curl -L "https://download.getcarina.com/carina/latest/$(uname -s)/$(uname -m)/carina" -o carina
+chmod a+x ./carina
+curl -sL https://download.getcarina.com/dvm/latest/install.sh | sh
+source ~/.dvm/dvm.sh
+./carina credentials lists
+. ~/.carina/clusters/"${CARINA_USERNAME}"/"${clustername}"/docker.env;
+dvm use;
+docker ps;
