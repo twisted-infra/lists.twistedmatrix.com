@@ -13,6 +13,8 @@ docker build -t build -f build.Dockerfile .;
 
 mkdir -p build/wheelhouse;
 
-docker run --rm build | (cd build/wheelhouse; mkdir tar xjf -);
+tar cjf - . | docker run --rm build | (cd build/wheelhouse; mkdir tar xjf -);
 
 docker build -t lists.twistedmatrix.com .;
+docker rm -f lists-container;
+docker run --detach --name lists-container --restart=always -p 8080:8080 lists.twistedmatrix.com;
