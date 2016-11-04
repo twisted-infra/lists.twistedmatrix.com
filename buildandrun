@@ -13,5 +13,16 @@ mkdir -p build/wheelhouse;
 tar cjf - . | docker run --rm -i build | (cd build/wheelhouse; tar xjf -);
 
 docker build -t lists.twistedmatrix.com .;
+
+# Create data volume containers if they don't already exist.
+if docker create --name lists.tls.dvc --volume lists.tls.volume:/data; then
+    docker run --rm -it --user "${TWISTED_USER_ID}" \
+           --volumes-from lists.tls.dvc ubuntu bash -c \
+           "touch /data/${TLS_HOSTNAME}.pem"
+fi;
+
 docker rm -f lists-container || true;
-docker run --detach --name lists-container --restart=always -p 8080:8080 lists.twistedmatrix.com;
+docker run --detach --user="${TWISTED_USER_ID}" \
+       --name lists.container --restart=always \
+       -v lists.tls.volume:/certificates \
+       -p 443:8443 lists.twistedmatrix.com;

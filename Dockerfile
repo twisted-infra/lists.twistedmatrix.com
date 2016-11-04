@@ -10,7 +10,8 @@ RUN . /appenv/bin/activate; \
 RUN . /appenv/bin/activate; \
     twist --help; echo 'again?'; twist --help;
 
-EXPOSE 8080
+EXPOSE 8443
+VOLUME /certificates
 
 ENTRYPOINT . /appenv/bin/activate; \
-           twist web;
+           twist web --port le:/certificates:tcp:8443;
