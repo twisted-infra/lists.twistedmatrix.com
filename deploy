@@ -13,7 +13,7 @@ docker build -t build -f build.Dockerfile .;
 
 mkdir -p build/wheelhouse;
 
-tar cjf - . | docker run --rm build | (cd build/wheelhouse; mkdir tar xjf -);
+tar cjf - . | docker run --rm -i build | (cd build/wheelhouse; tar xjf -);
 
 docker build -t lists.twistedmatrix.com .;
 docker rm -f lists-container;
