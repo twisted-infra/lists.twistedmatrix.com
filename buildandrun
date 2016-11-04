@@ -21,7 +21,7 @@ if docker create --name lists.tls.dvc --volume lists.tls.volume:/data hello-worl
            "touch /data/${TLS_HOSTNAME}.pem"
 fi;
 
-docker rm -f lists-container || true;
+docker rm -f lists.container || true;
 docker run --detach --user="${TWISTED_USER_ID}" \
        --name lists.container --restart=always \
        -v lists.tls.volume:/certificates \
