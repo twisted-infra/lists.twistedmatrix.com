@@ -6,6 +6,9 @@ cryptography==1.5.2
 eliot==0.11.0
 enum34==1.1.6
 funcsigs==1.0.2
+h2==2.5.0
+hpack==2.3.0
+hyperframe==4.0.1
 idna==2.1
 incremental==16.10.1
 ipaddress==1.0.17
@@ -13,6 +16,7 @@ mock==2.0.0
 ndg-httpsclient==0.4.2
 pbr==1.10.0
 pem==16.1.0
+priority==1.2.1
 pyasn1==0.1.9
 pyasn1-modules==0.0.8
 pycparser==2.17
