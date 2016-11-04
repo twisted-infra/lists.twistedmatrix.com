@@ -7,4 +7,12 @@ source ~/.dvm/dvm.sh
 ./carina credentials lists
 . ~/.carina/clusters/"${CARINA_USERNAME}"/lists/docker.env;
 dvm use;
-docker ps;
+
+docker build -t base -f base.Dockerfile .;
+docker build -t build -f build.Dockerfile .;
+
+mkdir -p build/wheelhouse;
+
+docker run --rm build | (cd build/wheelhouse; mkdir tar xjf -);
+
+docker build -t lists.twistedmatrix.com .;
