@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# This script should be runnable in any environment where the 'docker' command
+# line will tell an engine to do things.
+
+set -e;
+
+docker build -t base -f base.Dockerfile .;
+docker build -t build -f build.Dockerfile .;
+
+mkdir -p build/wheelhouse;
+
+tar cjf - . | docker run --rm -i build | (cd build/wheelhouse; tar xjf -);
+
+docker build -t lists.twistedmatrix.com .;
+docker rm -f lists-container;
+docker run --detach --name lists-container --restart=always -p 8080:8080 lists.twistedmatrix.com;

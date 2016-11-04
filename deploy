@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Set up an authenticated Carina environment for travis.
+
 curl -L "https://download.getcarina.com/carina/latest/$(uname -s)/$(uname -m)/carina" -o carina
 chmod a+x ./carina
 curl -sL https://download.getcarina.com/dvm/latest/install.sh | sh
@@ -8,13 +10,6 @@ source ~/.dvm/dvm.sh
 . ~/.carina/clusters/"${CARINA_USERNAME}"/lists/docker.env;
 dvm use;
 
-docker build -t base -f base.Dockerfile .;
-docker build -t build -f build.Dockerfile .;
+# Delegate to docker-building script.
 
-mkdir -p build/wheelhouse;
-
-tar cjf - . | docker run --rm -i build | (cd build/wheelhouse; tar xjf -);
-
-docker build -t lists.twistedmatrix.com .;
-docker rm -f lists-container;
-docker run --detach --name lists-container --restart=always -p 8080:8080 lists.twistedmatrix.com;
+. ./buildandrun;
