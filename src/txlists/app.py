@@ -1,14 +1,25 @@
 
-from klein import Klein
-from twisted.web.static import Data
+from klein import Klein, Plating
+from twisted.web.template import tags, slot
+
+page = Plating(
+    defaults={
+        "title": "hello!"
+    },
+    tags=tags.html(
+        tags.title("Twisted List Manager - ", slot("title")),
+        tags.body(
+            slot(Plating.CONTENT)
+        )
+    )
+)
 
 class ListsManagementSite(object):
     app = Klein()
 
-    @app.route("/")
+    @page.routed(app.route("/"),
+                 tags.h1("Hello, world!"))
     def root(self, request):
-        return Data(
-            "Hello! A list management website: {}".format(self)
-            .encode("utf-8"),
-            "text/plain"
-        )
+        return {
+            "title": "Front Page"
+        }

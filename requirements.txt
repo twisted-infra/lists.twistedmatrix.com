@@ -13,7 +13,7 @@ hyperframe==4.0.1
 idna==2.1
 incremental==16.10.1
 ipaddress==1.0.17
-git+https://github.com/glyph/klein.git@fe7fb87635d58ac25b9d697e6e777c3395ba09d6#egg=klein
+git+https://github.com/glyph/klein.git@38a8af98648707a8c18e600559c16e720a19a19f#egg=klein
 mock==2.0.0
 ndg-httpsclient==0.4.2
 pbr==1.10.0
