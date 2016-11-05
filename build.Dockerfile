@@ -1,6 +1,6 @@
 FROM base
 
-RUN apt-get install -qy libffi-dev libssl-dev pypy-dev clang bzip2
+RUN apt-get install -qy libffi-dev libssl-dev pypy-dev clang bzip2 git
 RUN . /appenv/bin/activate; \
     pip install wheel
 

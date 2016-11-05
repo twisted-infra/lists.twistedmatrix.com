@@ -1,9 +1,12 @@
 FROM base
 
+RUN mkdir /source
+WORKDIR /source
 ADD build/wheelhouse /wheelhouse
-ADD requirements.txt requirements.txt
+ADD setup.py /source/setup.py
+ADD src /source/src
 RUN . /appenv/bin/activate; \
-    pip install --no-index -f wheelhouse -r requirements.txt
+    pip install --no-index -f /wheelhouse .
 
 # Build the dropin cache; apparently necessary to avoid premature reactor
 # imports?

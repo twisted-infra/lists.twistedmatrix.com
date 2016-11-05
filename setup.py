@@ -7,6 +7,7 @@ if __name__ == "__main__":
         install_requires=[
             "klein",
             "twisted[tls,http2]",
+            "txacme",
         ],
         license="MIT",
         name="TxLists",

@@ -1,6 +1,10 @@
 
+from twisted.python.usage import Options as UsageOptions
 
-def makeService():
+class Options(UsageOptions, object):
+    ""
+
+def makeService(options):
     from twisted.application.internet import StreamServerEndpointService
     from twisted.internet.endpoints import serverFromString
     from twisted.internet import reactor
