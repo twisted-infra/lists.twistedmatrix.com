@@ -13,5 +13,4 @@ RUN . /appenv/bin/activate; \
 EXPOSE 8443
 VOLUME /certificates
 
-ENTRYPOINT . /appenv/bin/activate; \
-           twist web --port le:/certificates:tcp:8443;
+ENTRYPOINT . /appenv/bin/activate; twist txlists;
