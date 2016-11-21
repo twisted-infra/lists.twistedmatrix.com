@@ -10,7 +10,15 @@ docker build -t build -f build.Dockerfile .;
 
 mkdir -p build/wheelhouse;
 
-tar cjf - . | docker run --rm -i build | (cd build/wheelhouse; tar xjf -);
+CACHING_ARGS="$(
+    if [ -n "${PIP_INDEX_URL}" ]; then
+        echo "-e=PIP_TRUSTED_HOST=10.200.10.1 -e=PIP_INDEX_URL=$(echo $PIP_INDEX_URL | sed s/127.0.0.1/10.200.10.1/g)"; # as per 'docker for mac' networking guide alias
+    fi;
+)";
+
+echo "$argz";
+
+tar cjf - . | docker run --rm -i $CACHING_ARGS build | (cd build/wheelhouse; tar xjf -);
 
 docker build -t lists.twistedmatrix.com .;
 
