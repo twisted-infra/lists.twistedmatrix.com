@@ -12,7 +12,7 @@ ENV PIP_WHEEL_DIR=/wheelhouse
 ENV PIP_FIND_LINKS=/wheelhouse
 
 ENTRYPOINT bash -c 'cd /application; \
-           tar xjf --warning=no-unknown-keyword - > /dev/fd/2; \
+           tar --warning=no-unknown-keyword -xjf - > /dev/fd/2; \
            cd /wheelhouse; \
            ls /application > /dev/fd/2; \
            (. /appenv/bin/activate; \
