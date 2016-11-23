@@ -1,4 +1,5 @@
 
+import os
 from twisted.python.usage import Options as UsageOptions
 
 class Options(UsageOptions, object):
@@ -15,6 +16,8 @@ def makeService(options):
     resource = ListsManagementSite().app.resource()
 
     return StreamServerEndpointService(
-        serverFromString(reactor, "le:/certificates:tcp:8443"),
+        serverFromString(reactor, "{}:/certificates:tcp:8443".format(
+            "txsni" if os.environ.get("NO_RENEW") else "le"
+        )),
         Site(resource)
     )

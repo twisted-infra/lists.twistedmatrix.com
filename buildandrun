@@ -22,15 +22,35 @@ tar cjf - . | docker run --rm -i $CACHING_ARGS build | (cd build/wheelhouse; tar
 
 docker build -t lists.twistedmatrix.com .;
 
-# Create data volume containers if they don't already exist.
-if docker create --name lists.tls.dvc --volume lists.tls.volume:/data hello-world; then
+function dvc.volname () {
+    # Allow for setting VOLUME_PREFIX so that we can map host paths if we want,
+    # for development.
+    local VOLUME_NAME="$1"; shift;
+    echo -n "${VOLUME_PREFIX:+${VOLUME_PREFIX}/}${VOLUME_NAME}.volume";
+}
+
+function dvc.new () {
+    local VOLUME_NAME="$1"; shift;
+    docker create --name "${VOLUME_NAME}.dvc" \
+           --volume "$(dvc.volname ${VOLUME_NAME}):/data" hello-world;
+    docker run --rm -it --volumes-from="${VOLUME_NAME}.dvc" ubuntu bash -c \
+           "chown ${TWISTED_USER_ID} /data";
+    return "$?";
+}
+
+
+if dvc.new lists.tls; then
     docker run --rm -it --user "${TWISTED_USER_ID}" \
-           --volumes-from lists.tls.dvc ubuntu bash -c \
-           "touch /data/${TLS_HOSTNAME}.pem"
+           --volumes-from "lists.tls.dvc" ubuntu bash -c \
+           "if [ ! -e /data/${TLS_HOSTNAME}.pem ]; then touch /data/${TLS_HOSTNAME}.pem; fi"
 fi;
 
+dvc.new lists.database || true;
+dvc.new lists.messages || true;
+
+# Create data volume containers if they don't already exist.
 docker rm -f lists.container || true;
 docker run --detach --user="${TWISTED_USER_ID}" \
        --name lists.container --restart=always \
-       -v lists.tls.volume:/certificates \
+       -v "$(dvc.volname lists.tls):/certificates" \
        -p 443:8443 lists.twistedmatrix.com;

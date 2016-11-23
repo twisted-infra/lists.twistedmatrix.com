@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# In development, get your own TLS certs, and somehow inject them into the
+# volume.
+NO_RENEW=yes TWISTED_USER_ID="$(id -u)" TLS_HOSTNAME="$(hostname -f)" \
+        bash -x buildandrun
