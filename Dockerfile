@@ -15,5 +15,7 @@ RUN . /appenv/bin/activate; \
 
 EXPOSE 8443
 VOLUME /certificates
+VOLUME /database
+VOLUME /legacy-mailman-archive
 
 ENTRYPOINT . /appenv/bin/activate; twist txlists;
