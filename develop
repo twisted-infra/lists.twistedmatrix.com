@@ -9,3 +9,5 @@ NO_RENEW=yes \
         TLS_HOSTNAME="$(hostname -f)" \
         VOLUME_PREFIX="$PWD/volumes" \
         bash -x buildandrun;
+
+docker logs lists.container;
