@@ -9,7 +9,7 @@ RUN apt-get update
 
 RUN apt-get install -qyy \
     -o APT::Install-Recommends=false -o APT::Install-Suggests=false \
-    virtualenv pypy libffi6 openssl ca-certificates
+    virtualenv pypy libffi6 openssl ca-certificates git
 
 RUN virtualenv -p /usr/bin/pypy /appenv
 RUN . /appenv/bin/activate; pip install pip==9.0.0
