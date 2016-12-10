@@ -50,7 +50,7 @@ dvc.new lists.messages || true;
 
 # Create data volume containers if they don't already exist.
 docker rm -f lists.container || true;
-docker run --detach --user="${TWISTED_USER_ID}" \
+docker run -e NO_RENEW --detach --user="${TWISTED_USER_ID}" \
        --name lists.container --restart=always \
        -v "$(dvc.volname lists.tls):/certificates" \
        -v "$(dvc.volname lists.database):/database" \
