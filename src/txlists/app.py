@@ -49,7 +49,9 @@ class MessageIngestor(object):
                 ))
 def authorize_ingestor(metadata, datastore, session_store, transaction,
                        session):
-    return MessageIngestor(datastore, metadata['message'], metadata['reply'])
+    return MessageIngestor(datastore,
+                           metadata.tables['message'],
+                           metadata.tables['reply'])
 
 
 class ListsManagementSite(object):
