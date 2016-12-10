@@ -9,6 +9,7 @@ if __name__ == "__main__":
             "twisted[tls]",
             "txacme",
             "alchimia",
+            "txscrypt",
         ],
         license="MIT",
         name="TxLists",
