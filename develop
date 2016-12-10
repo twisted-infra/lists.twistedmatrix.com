@@ -1,6 +1,11 @@
 #!/bin/bash
 
+mkdir -pf volumes;
+
 # In development, get your own TLS certs, and somehow inject them into the
 # volume.
-NO_RENEW=yes TWISTED_USER_ID="$(id -u)" TLS_HOSTNAME="$(hostname -f)" \
-        bash -x buildandrun
+NO_RENEW=yes \
+        TWISTED_USER_ID="$(id -u)" \
+        TLS_HOSTNAME="$(hostname -f)" \
+        VOLUME_PREFIX="volumes" \
+        bash -x buildandrun;
