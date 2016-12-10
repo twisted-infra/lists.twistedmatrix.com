@@ -58,9 +58,11 @@ class ListsManagementSite(object):
     @classmethod
     @inlineCallbacks
     def makeManagementSite(cls, reactor):
-        procurer = yield open_session_store(reactor,
-                                            "sqlite:///sessions.sqlite",
-                                            [authorize_ingestor.authorizer])
+        procurer = yield open_session_store(
+            reactor,
+            "sqlite:////database/sessions.sqlite",
+            [authorize_ingestor.authorizer]
+        )
         returnValue(cls(procurer))
 
     def __init__(self, procurer):
