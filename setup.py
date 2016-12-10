@@ -8,6 +8,7 @@ if __name__ == "__main__":
             "klein",
             "twisted[tls]",
             "txacme",
+            "sqlalchemy",
         ],
         license="MIT",
         name="TxLists",
