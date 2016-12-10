@@ -10,4 +10,4 @@ NO_RENEW=yes \
         VOLUME_PREFIX="$PWD/volumes" \
         bash -x buildandrun;
 
-docker logs lists.container;
+docker logs -f lists.container;
