@@ -11,7 +11,7 @@ RUN . /appenv/bin/activate; \
 # Build the dropin cache; apparently necessary to avoid premature reactor
 # imports?
 RUN . /appenv/bin/activate; \
-    twist --help; echo 'again?'; twist --help;
+    echo "Generating dropin cache..."; twist --help > /dev/null; echo "Generated.";
 
 EXPOSE 8443
 VOLUME /certificates
