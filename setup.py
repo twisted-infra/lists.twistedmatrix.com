@@ -10,6 +10,7 @@ if __name__ == "__main__":
             "txacme",
             "alchimia",
             "txscrypt",
+            "html5lib",
         ],
         license="MIT",
         name="TxLists",
