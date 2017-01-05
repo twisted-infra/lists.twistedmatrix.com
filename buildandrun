@@ -18,7 +18,9 @@ CACHING_ARGS="$(
 
 echo "$argz";
 
-tar cjf - . | docker run --rm -i $CACHING_ARGS build | (cd build/wheelhouse; tar xjf -);
+tar cjf - -X .dockerignore . | \
+    docker run --rm -i $CACHING_ARGS build | \
+    (cd build/wheelhouse; tar xjf -);
 
 docker build -t lists.twistedmatrix.com .;
 
