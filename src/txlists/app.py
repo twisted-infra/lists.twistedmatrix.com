@@ -111,7 +111,7 @@ class IngestionTask(object):
         
         """
         def setErrorStatus(failure):
-            self.statusify(failure.getTraceback().decode("charmap"))
+            self.statusify(failure.getTraceback().decode("charmap"), True)
             self._log.failure('doing batch work', failure)
         def oneMappingBatch(count, paths):
             @self._dataStore.sql
