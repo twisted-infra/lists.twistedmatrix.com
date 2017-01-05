@@ -9,6 +9,7 @@ enum34==1.1.6
 funcsigs==1.0.2
 h2==2.5.1
 hpack==2.3.0
+html5lib==0.999999999
 hyperframe==4.0.1
 idna==2.2
 incremental==16.10.1
@@ -36,5 +37,6 @@ Twisted==16.6.0
 txacme==0.9.1
 txscrypt==3.0.0
 TxSNI==0.1.7
+webencodings==0.5
 Werkzeug==0.11.15
 zope.interface==4.3.3
