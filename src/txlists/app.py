@@ -1,11 +1,13 @@
 
 import html5lib
-from email.utils import parsedate_tz, mktime_tz#, parseaddr
+from email.utils import parsedate_tz, mktime_tz, parseaddr
+import mailbox
 
 from twisted.web.template import tags, slot
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.python.filepath import FilePath
 from twisted.internet.task import cooperate
+from twisted.logger import Logger
 
 from klein import Klein, Plating
 from klein.storage.sql import authorizer_for, open_session_store, tables
@@ -27,6 +29,9 @@ page = Plating(
 )
 
 def normalizeDate(string):
+    """
+    Convert a date stamp found in an email into a UTC timestamp.
+    """
     data = parsedate_tz(string)
     if data is None:
         return None
@@ -50,7 +55,27 @@ def extractPathInfo(fp):
                              namespaceHTMLElements=False)
     [date] = content.findall("./body/i")
     sender = content.find("./body/a").text.replace(" at ", "@").strip()
-    return number, sender, date
+    return number, sender, normalizeDate(date.text)
+
+
+
+@inlineCallbacks
+def enbatch(batchProcessor, sequence, size=100):
+    """
+    
+    """
+    batch = []
+    count = 0
+    for element in sequence:
+        batch.append(element)
+        if len(batch) >= size:
+            count += 1
+            yield batchProcessor(count, batch)
+            batch = []
+    count += 1
+    if batch:
+        yield batchProcessor(count, batch)
+
 
 
 @attr.s
@@ -61,53 +86,95 @@ class IngestionTask(object):
     _archiveDir = attr.ib()
     _dataStore = attr.ib()
     _messageTable = attr.ib()
-    _currentStatus = attr.ib(default=u'')
+    _currentStatus = attr.ib(default=attr.Factory(list))
+    _currentErrors = attr.ib(default=attr.Factory(list))
+    _log = Logger()
+
+    def statusify(self, anStatus, error=False):
+        """
+        
+        """
+        l = self._currentStatus if not error else self._currentErrors
+        l.append(anStatus)
+        if len(l) > 10:
+            l.pop(0)
 
     def report(self):
         """
         
         """
-        return self._currentStatus
+        return u"\n".join(self._currentStatus + [u""] + self._currentErrors)
 
-    def ingestOneBatch(self, paths):
-        """
-        
-        """
-        @self._dataStore.sql
-        @inlineCallbacks
-        def do(txn):
-            for path in paths:
-                counter, sender, received = extractPathInfo(path)
-                yield txn.execute(
-                    self._messageTable.insert().values(
-                        list=self._archiveDir.basename(),
-                        counter=counter,
-                        sender=sender,
-                        received=received,
-                    )
-                )
-        return do
 
     def go(self):
         """
         
         """
-        def justKeepIngesting():
-            batchSize = 100
-            thisBatch = []
-            for idx, eachPath in enumerate(self._archiveDir.walk()):
-                if (
-                        len(eachPath.basename().split(".")) == 2
-                        and eachPath.basename().endswith(".html")
-                ):
-                    thisBatch.append(eachPath)
-                    if len(thisBatch) >= batchSize:
-                        yield self.ingestOneBatch(thisBatch)
-                        thisBatch = []
-                        self._currentStatus = (
-                            u'ingested {} batches'.format(idx)
+        def setErrorStatus(failure):
+            self.statusify(failure.getTraceback().decode("charmap"))
+            self._log.failure('doing batch work', failure)
+        def oneMappingBatch(count, paths):
+            @self._dataStore.sql
+            @inlineCallbacks
+            def do(txn):
+                for path in paths:
+                    counter, sender, received = extractPathInfo(path)
+                    yield txn.execute(
+                        self._messageTable.insert().values(
+                            list=self._archiveDir.basename(),
+                            counter=counter,
+                            sender=sender,
+                            received=received,
                         )
-            self._currentStatus = u'DONE!'
+                    )
+                self.statusify(u'mapped {} message counter batches'
+                               .format(count))
+            return do.addErrback(setErrorStatus)
+
+        def oneContentsBatch(count, messages):
+            @self._dataStore.sql
+            @inlineCallbacks
+            def do(txn):
+                self._log.info("starting message batch")
+                for message in messages:
+                    m = self._messageTable
+                    self._log.info("message: {m}", m=message['subject'])
+                    rowcount = (yield (yield txn.execute(
+                        m.update(
+                            (m.c.list == self._archiveDir.basename()) &
+                            (m.c.sender == parseaddr(message['From'])[1]) &
+                            (m.c.received == normalizeDate(message['Date']))
+                        ).values(
+                            # xxx py3: no as_bytes on py2.
+                            contents=message.as_string(),
+                            id=message['message-id'],
+                            subject=message['subject'],
+                        )
+                    )).rowcount)
+                    self._log.info("message: {m} updated {n} rows",
+                                   m=message['subject'], n=rowcount)
+                self.statusify(u'loaded {} message batches'.format(count))
+            return do.addErrback(setErrorStatus)
+
+        def justKeepIngesting():
+            yield enbatch(
+                oneMappingBatch,
+                (
+                    eachPath for eachPath in self._archiveDir.walk()
+                    if (
+                            len(eachPath.basename().split(".")) == 2
+                            and eachPath.basename().endswith(".html")
+                            and eachPath.basename().startswith("0")
+                    )
+                )
+            )
+            self.statusify(u'mapping done!')
+            mbox = self._archiveDir.basename() + '.mbox'
+            yield enbatch(
+                oneContentsBatch,
+                mailbox.mbox(self._archiveDir.sibling(mbox).child(mbox).path)
+            )
+            self.statusify(u'loaded everything!')
         self._task = cooperate(justKeepIngesting())
 
 
@@ -125,7 +192,7 @@ class MessageIngestor(object):
                                      self._messageTable)
                 globalIngestionList[listID] = task
                 task.go()
-            return globalIngestionList.report()
+            return globalIngestionList[listID].report()
         else:
             return u'nope not a list'
 
@@ -136,8 +203,9 @@ class MessageIngestor(object):
                         Column("list", String(), index=True),
                         Column("id", String(), index=True),
                         Column("sender", String(), index=True),
+                        Column("subject", String(), index=True),
                         # vvv previously "date_timestamp" vvv
-                        Column("received", String(), index=True),
+                        Column("received", Integer(), index=True),
                         Column("counter", Integer(), index=True),
                         Column("contents", String()),
                     ],
@@ -161,7 +229,7 @@ class ListsManagementSite(object):
     def makeManagementSite(cls, reactor):
         procurer = yield open_session_store(
             reactor,
-            "sqlite:////database/sessions2.sqlite",
+            "sqlite:////database/sessions3.sqlite",
             [authorize_ingestor.authorizer]
         )
         returnValue(cls(procurer))
@@ -184,7 +252,7 @@ class ListsManagementSite(object):
     @authorized(
         page.routed(app.route("/ingest/<listID>"),
                     [tags.h1("Loading..."),
-                     tags.div(slot("ingested"))]),
+                     tags.div(tags.pre(slot("ingested")))]),
         ingestor=MessageIngestor,
     )
     def ingest(self, request, listID, ingestor):
