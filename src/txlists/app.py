@@ -141,14 +141,16 @@ class IngestionTask(object):
                     self._log.info("message: {m}", m=message['subject'])
                     rowcount = (yield (yield txn.execute(
                         m.update(
-                            (m.c.list == self._archiveDir.basename()) &
-                            (m.c.sender == parseaddr(message['From'])[1]) &
+                            (m.c.list == self._archiveDir.asTextMode()
+                             .basename()) &
+                            (m.c.sender == parseaddr(message['From'])[1]
+                             .decode('charmap')) &
                             (m.c.received == normalizeDate(message['Date']))
                         ).values(
                             # xxx py3: no as_bytes on py2.
-                            contents=message.as_string(),
-                            id=message['message-id'],
-                            subject=message['subject'],
+                            contents=message.as_string().decode('charmap'),
+                            id=message['message-id'].decode('charmap'),
+                            subject=message['subject'].decode('charmap'),
                         )
                     )).rowcount)
                     self._log.info("message: {m} updated {n} rows",
