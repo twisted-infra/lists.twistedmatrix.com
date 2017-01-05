@@ -1,0 +1,2 @@
+#!/bin/bash
+rsync -avz root@twistedmatrix.com:/var/lib/mailman/archives/private/ ./volumes/lists.messages.volume/
