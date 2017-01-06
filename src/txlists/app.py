@@ -1,6 +1,7 @@
 
 import html5lib
 from email.utils import parsedate_tz, mktime_tz, parseaddr
+from email.parser import Parser
 import mailbox
 
 from twisted.web.template import tags, slot
@@ -186,6 +187,37 @@ class MessageIngestor(object):
     _messageTable = attr.ib()
     _replyTable = attr.ib()
 
+    def someMessagesForList(self, listID):
+        @self._dataStore.sql
+        @inlineCallbacks
+        def query(txn):
+            m = self._messageTable
+            resultProxy = yield txn.execute(m.select(m.c.list == listID)
+                                            .limit(10))
+            returnValue((yield resultProxy.fetchall()))
+        return query
+
+    def oneMessageBody(self, listID, messageCounter):
+        @self._dataStore.sql
+        @inlineCallbacks
+        def query(txn):
+            m = self._messageTable
+            result = (yield
+                      (yield txn.execute(
+                          m.select((m.c.list == listID) &
+                                   (m.c.counter == messageCounter))))
+                      .fetchall())[0]
+            message = Parser().parsestr(result["contents"])
+            for part in message.walk():
+                if part.get_content_type() == 'text/plain':
+                    body = part.get_payload(decode=True)
+                    break
+            else:
+                body = u'no body found'
+            returnValue(body)
+        return query
+
+
     def ingestSomeMessages(self, listID):
         listDir = archives.child(listID)
         if listDir.isdir():
@@ -222,6 +254,18 @@ def authorize_ingestor(metadata, datastore, session_store, transaction,
                            metadata.tables['message'],
                            metadata.tables['reply'])
 
+@Plating.widget(
+    tags=tags.a(href=["/list/", slot("listID"),
+                      "/message/", slot("messageCounter")])(
+                          slot("subject")
+                      )
+)
+def oneMessageLink(messageRow):
+    return {
+        "listID": messageRow["list"],
+        "messageCounter": messageRow["counter"],
+        "subject": messageRow["subject"],
+    }
 
 class ListsManagementSite(object):
     app = Klein()
@@ -263,4 +307,35 @@ class ListsManagementSite(object):
         """
         return {
             "ingested": ingestor.ingestSomeMessages(listID)
+        }
+
+    @authorized(
+        page.routed(app.route("/list/<listID>/archive/"),
+                    [tags.h1("List: ", slot("listID")),
+                     tags.div(render="messages:list")(slot("item"))]),
+        # XXX "ingestor" is probably a bad name if it does everything
+        ingestor=MessageIngestor,
+    )
+    @inlineCallbacks
+    def archiveIndex(self, request, listID, ingestor):
+        returnValue({
+            "listID": listID,
+            "messages": [oneMessageLink.widget(row) for row in
+                         (yield ingestor.someMessagesForList(listID))]
+        })
+
+
+    @authorized(
+        page.routed(app.route("/list/<listID>/message/<messageCounter>"),
+                    [tags.h1("List: ", slot("listID")),
+                     tags.pre(slot("messageText"))]),
+        ingestor=MessageIngestor,
+    )
+    def messageView(self, request, listID, messageCounter, ingestor):
+        """
+        
+        """
+        return {
+            "listID": listID,
+            "messageText": ingestor.oneMessageBody(listID, messageCounter),
         }
