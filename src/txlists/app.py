@@ -197,6 +197,42 @@ class MessageIngestor(object):
             returnValue((yield resultProxy.fetchall()))
         return query
 
+    def monthsForList(self, listID):
+        @self._dataStore.sql
+        @inlineCallbacks
+        def monthsQuery(txn):
+            import datetime
+            from sqlalchemy.sql.functions import max as Max
+            from sqlalchemy.sql.expression import Select
+            from sqlalchemy import desc
+            m = self._messageTable
+            l = m.c.list == listID
+            monthsMessagesRows = []
+            startTime = (
+                yield (yield txn.execute(Select([Max(m.c.received)], l)))
+                .fetchall()
+            )[0][0]
+            # start at the end month, go backwards
+            thisDateTime = (datetime.datetime.utcfromtimestamp(startTime)
+                            .replace(day=1, hour=1, minute=1, second=0))
+            for ignored in range(20):
+                thisTimestamp = (
+                    thisDateTime - datetime.datetime.utcfromtimestamp(0)
+                ).total_seconds()
+                oneNextMessages = (yield (yield txn.execute(
+                    Select([m.c], l & (m.c.received >= thisTimestamp))
+                    .order_by(desc(m.c.received)).limit(1)
+                )).fetchall())
+                if oneNextMessages:
+                    monthsMessagesRows.append(oneNextMessages[0])
+                else:
+                    break
+                thisDateTime = thisDateTime.replace(
+                    month=thisDateTime.month - 1
+                )
+            returnValue(monthsMessagesRows)
+        return monthsQuery
+
     def oneMessageBody(self, listID, messageCounter):
         @self._dataStore.sql
         @inlineCallbacks
@@ -312,7 +348,9 @@ class ListsManagementSite(object):
     @authorized(
         page.routed(app.route("/list/<listID>/archive/"),
                     [tags.h1("List: ", slot("listID")),
-                     tags.div(render="messages:list")(slot("item"))]),
+                     tags.table()(
+                         tags.tr(render="months:list")(slot("item"))
+                     )]),
         # XXX "ingestor" is probably a bad name if it does everything
         ingestor=MessageIngestor,
     )
@@ -320,8 +358,8 @@ class ListsManagementSite(object):
     def archiveIndex(self, request, listID, ingestor):
         returnValue({
             "listID": listID,
-            "messages": [oneMessageLink.widget(row) for row in
-                         (yield ingestor.someMessagesForList(listID))]
+            "months": [oneMessageLink.widget(row) for row in
+                       (yield ingestor.monthsForList(listID))]
         })
 
 
