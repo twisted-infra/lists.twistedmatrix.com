@@ -219,9 +219,11 @@ class MessageIngestor(object):
                 thisTimestamp = (
                     thisDateTime - datetime.datetime.utcfromtimestamp(0)
                 ).total_seconds()
+                expr = Select(m.c, l & (m.c.received >= thisTimestamp))
+                expr = expr.order_by(desc(m.c.received))
+                expr = expr.limit(1)
                 oneNextMessages = (yield (yield txn.execute(
-                    Select([m.c], l & (m.c.received >= thisTimestamp))
-                    .order_by(desc(m.c.received)).limit(1)
+                    expr
                 )).fetchall())
                 if oneNextMessages:
                     monthsMessagesRows.append(oneNextMessages[0])
