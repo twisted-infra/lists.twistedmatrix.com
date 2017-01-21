@@ -317,8 +317,10 @@ def oneMessageLink(messageRow):
     return {
         "listID": messageRow["list"],
         "messageCounter": messageRow["counter"],
-        "subject": messageRow["subject"],
-        "date": unicode(datetime.datetime.utcfromtimestamp(messageRow["received"])),
+        "subject": messageRow["subject"] or u"(no subject)",
+        "date": unicode(datetime.datetime.utcfromtimestamp(
+            messageRow["received"])
+        ),
     }
 
 class ListsManagementSite(object):
