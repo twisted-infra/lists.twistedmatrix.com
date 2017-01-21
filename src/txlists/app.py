@@ -4,6 +4,8 @@ from email.utils import parsedate_tz, mktime_tz, parseaddr
 from email.parser import Parser
 import mailbox
 
+import datetime
+
 from twisted.web.template import tags, slot
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.python.filepath import FilePath
@@ -15,6 +17,10 @@ from klein.storage.sql import authorizer_for, open_session_store, tables
 from klein._session import requirer
 
 from sqlalchemy import Column, String, Integer
+from sqlalchemy.sql.functions import max as Max
+from sqlalchemy.sql.expression import Select
+from sqlalchemy import desc
+
 import attr
 
 page = Plating(
@@ -201,10 +207,6 @@ class MessageIngestor(object):
         @self._dataStore.sql
         @inlineCallbacks
         def monthsQuery(txn):
-            import datetime
-            from sqlalchemy.sql.functions import max as Max
-            from sqlalchemy.sql.expression import Select
-            from sqlalchemy import desc
             m = self._messageTable
             l = m.c.list == listID
             monthsMessagesRows = []
@@ -215,7 +217,7 @@ class MessageIngestor(object):
             # start at the end month, go backwards
             thisDateTime = (datetime.datetime.utcfromtimestamp(startTime)
                             .replace(day=1, hour=1, minute=1, second=0))
-            for ignored in range(20):
+            for ignored in range(100):
                 thisTimestamp = (
                     thisDateTime - datetime.datetime.utcfromtimestamp(0)
                 ).total_seconds()
@@ -299,16 +301,24 @@ def authorize_ingestor(metadata, datastore, session_store, transaction,
                            metadata.tables['reply'])
 
 @Plating.widget(
-    tags=tags.a(href=["/list/", slot("listID"),
-                      "/message/", slot("messageCounter")])(
-                          slot("subject")
-                      )
+    tags=tags.transparent(
+        tags.td(
+            tags.a(href=["/list/", slot("listID"),
+                         "/message/", slot("messageCounter")])(
+                             slot("subject")
+                         )
+        ),
+        tags.td(
+            slot("date")
+        )
+    )
 )
 def oneMessageLink(messageRow):
     return {
         "listID": messageRow["list"],
         "messageCounter": messageRow["counter"],
         "subject": messageRow["subject"],
+        "date": unicode(datetime.datetime.utcfromtimestamp(messageRow["received"])),
     }
 
 class ListsManagementSite(object):

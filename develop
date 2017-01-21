@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# quick syntax check before we spend a minute waiting for builds
+if ! pyflakes src/txlists; then
+    echo "pyflakes failed";
+    exit 1;
+fi;
+
 mkdir -p volumes;
 
 # In development, get your own TLS certs, and somehow inject them into the
