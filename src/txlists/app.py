@@ -450,7 +450,7 @@ class ListsManagementSite(object):
     @inlineCallbacks
     def webhook(self, request):
         content = request.args
-        url = content['message-url']
+        url = content['message-url'][0]
         token = content['token'][0]
         timestamp = content['timestamp'][0]
         signature = content['signature'][0]
@@ -472,9 +472,10 @@ class ListsManagementSite(object):
         ingestor = ((yield session.authorize([MessageIngestor]))
                     [MessageIngestor])
         self.log.info("fetching message")
-        response = yield treq.get(url.encode("ascii"),
-                                  {"Accept": "message/rfc2822"},
-                                  auth=("api", os.environ['MAILGUN_API_KEY']))
+        response = yield treq.get(
+            url, {"Accept": "message/rfc2822"},
+            auth=("api", os.environ['MAILGUN_API_KEY'])
+        )
         self.log.info("extracting response body")
         body = yield treq.content(response)
         self.log.info("parsing response body")
