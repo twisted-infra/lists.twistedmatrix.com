@@ -385,7 +385,7 @@ class ListsManagementSite(object):
     @app.route("/mailgun/webhook", methods=["POST"])
     @inlineCallbacks
     def webhook(self, request):
-        content = json.loads(request.content.read())
+        content = json.loads(request.args)
         url = content['message-url']
         signature = content['signature']
         timestamp = content['timestamp']
