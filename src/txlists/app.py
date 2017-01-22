@@ -407,7 +407,7 @@ class ListsManagementSite(object):
                     [tags.h1("List: ", slot("listID")),
                      tags.h2("Subject: ", slot("subject")),
                      tags.pre(
-                         style="white-space: pre-wrap; max-width: 120em;"
+                         style="white-space: pre-wrap; max-width: 90em;"
                      )(slot("messageText"))]),
         ingestor=MessageIngestor,
     )
