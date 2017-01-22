@@ -405,9 +405,9 @@ class ListsManagementSite(object):
     def webhook(self, request):
         content = request.args
         url = content['message-url']
-        token = content['token']
-        timestamp = content['timestamp']
-        signature = content['signature']
+        token = content['token'][0]
+        timestamp = content['timestamp'][0]
+        signature = content['signature'][0]
         if not mgverify(os.environ['MAILGUN_API_KEY'], token, timestamp,
                         signature):
             self.log.warn(
