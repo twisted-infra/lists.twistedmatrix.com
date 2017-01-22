@@ -215,9 +215,12 @@ class MessageIngestor(object):
                 .fetchall()
             )[0][0]
             # start at the end month, go backwards
-            thisDateTime = (datetime.datetime.utcfromtimestamp(startTime)
-                            .replace(day=1, hour=1, minute=1, second=0))
-            for ignored in range(100):
+            thisDateTime = (
+                datetime.datetime.utcfromtimestamp(startTime)
+                .replace(day=1, hour=0, minute=0, second=0)
+                - datetime.timedelta(seconds=1)
+            )
+            for ignored in range(400):
                 thisTimestamp = (
                     thisDateTime - datetime.datetime.utcfromtimestamp(0)
                 ).total_seconds()
@@ -231,14 +234,11 @@ class MessageIngestor(object):
                     monthsMessagesRows.append(oneNextMessages[0])
                 else:
                     break
-                nextMonthValue = thisDateTime.month - 1
-                nextYearValue = thisDateTime.year
-                if nextMonthValue < 1:
-                    nextYearValue -= 1
-                    nextMonthValue = 12
-                thisDateTime = thisDateTime.replace(
-                    month=nextMonthValue,
-                    year=nextYearValue
+                thisDateTime = (
+                    datetime.datetime.utcfromtimestamp(
+                        oneNextMessages[-1].received
+                    ).replace(day=1, hour=0, minute=0, second=0)
+                    - datetime.timedelta(seconds=1)
                 )
             returnValue(monthsMessagesRows)
         return monthsQuery
