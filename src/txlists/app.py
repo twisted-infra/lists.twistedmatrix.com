@@ -357,6 +357,7 @@ def oneMessageLink(messageRow):
 
 class ListsManagementSite(object):
     app = Klein()
+    log = Logger()
 
     @classmethod
     @inlineCallbacks
@@ -404,11 +405,15 @@ class ListsManagementSite(object):
     def webhook(self, request):
         content = request.args
         url = content['message-url']
-        signature = content['signature']
-        timestamp = content['timestamp']
         token = content['token']
+        timestamp = content['timestamp']
+        signature = content['signature']
         if not mgverify(os.environ['MAILGUN_API_KEY'], token, timestamp,
                         signature):
+            self.log.warn(
+                "hook verification failed: {token} {timestamp} {signature}"
+                .format(token=token, timestamp=timestamp, signature=signature)
+            )
             request.setResponseCode(401)
             returnValue(b'unauthorized')
         # we need to get access to the data store, but the API-driven HTTP
@@ -417,14 +422,23 @@ class ListsManagementSite(object):
         request.requestHeaders.setRawHeaders(
             b"X-Auth-Token", [b"synthetic-mailgun-token"]
         )
+        self.log.info("procuring session")
         session = yield self.procurer.procure_session(request)
+        self.log.info("authorizing ingestor")
         ingestor = yield session.authorize(MessageIngestor)[MessageIngestor]
+        self.log.info("fetching message")
         response = yield treq.get(url.encode("ascii"),
                                   {"Accept": "message/rfc2822"},
                                   auth=("api", os.environ['MAILGUN_API_KEY']))
+        self.log.info("extracting response body")
         body = yield treq.content(response)
+        self.log.info("parsing response body")
         body = json.loads(body)
-        ingestor.ingestMessage(body["body-mime"])
+        self.log.info("extracting message body")
+        body = body["body-mime"]
+        self.log.info("ingesting message body")
+        yield ingestor.ingestMessage(body)
+        self.log.info("OK!")
         returnValue(b"OK")
 
 
