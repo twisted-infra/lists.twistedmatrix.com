@@ -15,8 +15,9 @@ from twisted.python.filepath import FilePath
 from twisted.internet.task import cooperate
 from twisted.logger import Logger
 
-from klein import Klein, Plating
+from klein import Klein, Plating, SessionProcurer
 from klein.storage.sql import authorizer_for, open_session_store, tables
+from klein.interfaces import SessionMechanism
 from klein._session import requirer
 
 import treq
@@ -355,6 +356,47 @@ def oneMessageLink(messageRow):
         ),
     }
 
+class PreauthenticatableSessionProcurer(object):
+    """
+    
+    """
+    def __init__(self, sessionStore):
+        """
+        
+        """
+        self._realProcurer = SessionProcurer(sessionStore)
+        self._store = sessionStore
+        self._preauths = {}
+
+
+    @inlineCallbacks
+    def procure_session(self, request):
+        """
+        
+        """
+        preauthenticated = getattr(request, 'preauthenticated', None)
+        if preauthenticated is None:
+            # XXX we could move the mailgun token authentication here, and then
+            # just have this behave as normal route authentication, maybe?
+            returnValue((yield self._realProcurer.procure_session(request)))
+        if preauthenticated in self._preauths:
+            sessionID = self._preauths[preauthenticated]
+            returnValue(
+                (yield self._store.load_session(
+                    sessionID,
+                    request.isSecure(),
+                    SessionMechanism.AuthToken))
+            )
+        else:
+            session = (
+                yield self._store.new_session(request.isSecure(),
+                                              SessionMechanism.AuthToken)
+            )
+            self._preauths[preauthenticated] = session.identifier
+            returnValue(session)
+
+
+
 class ListsManagementSite(object):
     app = Klein()
     log = Logger()
@@ -365,7 +407,8 @@ class ListsManagementSite(object):
         procurer = yield open_session_store(
             reactor,
             "sqlite:////database/sessions3.sqlite",
-            [authorize_ingestor.authorizer]
+            [authorize_ingestor.authorizer],
+            procurer_from_store=PreauthenticatableSessionProcurer
         )
         returnValue(cls(procurer))
 
@@ -419,9 +462,7 @@ class ListsManagementSite(object):
         # we need to get access to the data store, but the API-driven HTTP
         # client here is not going to authenticate via a header _or_ a cookie.
         # There should probably be a different public API for this.
-        request.requestHeaders.setRawHeaders(
-            b"X-Auth-Token", [b"synthetic-mailgun-token"]
-        )
+        request.preauthenticated = 'mailgun'
         self.log.info("procuring session")
         session = yield self.procurer.procure_session(request)
         self.log.info("authorizing ingestor")
