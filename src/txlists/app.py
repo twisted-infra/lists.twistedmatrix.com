@@ -388,12 +388,12 @@ class PreauthenticatableSessionProcurer(object):
                 (yield self._store.load_session(
                     sessionID,
                     request.isSecure(),
-                    SessionMechanism.AuthToken))
+                    SessionMechanism.Header))
             )
         else:
             session = (
                 yield self._store.new_session(request.isSecure(),
-                                              SessionMechanism.AuthToken)
+                                              SessionMechanism.Header)
             )
             self._preauths[preauthenticated] = session.identifier
             returnValue(session)
