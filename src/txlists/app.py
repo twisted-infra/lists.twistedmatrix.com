@@ -1,4 +1,7 @@
 
+import json
+import os
+
 import html5lib
 from email.utils import parsedate_tz, mktime_tz, parseaddr
 from email.parser import Parser
@@ -15,6 +18,8 @@ from twisted.logger import Logger
 from klein import Klein, Plating
 from klein.storage.sql import authorizer_for, open_session_store, tables
 from klein._session import requirer
+
+import treq
 
 from sqlalchemy import Column, String, Integer
 from sqlalchemy.sql.functions import max as Max
@@ -34,6 +39,14 @@ page = Plating(
         )
     )
 )
+
+import hashlib, hmac
+
+def mgverify(api_key, token, timestamp, signature):
+    hmac_digest = hmac.new(key=api_key,
+                           msg='{}{}'.format(timestamp, token),
+                           digestmod=hashlib.sha256).hexdigest()
+    return hmac.compare_digest(unicode(signature), unicode(hmac_digest))
 
 def normalizeDate(string):
     """
@@ -368,6 +381,35 @@ class ListsManagementSite(object):
         return {
             "title": "Front Page"
         }
+
+    @app.route("/mailgun/webhook", methods=["POST"])
+    @inlineCallbacks
+    def webhook(self, request):
+        content = json.loads(request.content.read())
+        url = content['message-url']
+        signature = content['signature']
+        timestamp = content['timestamp']
+        token = content['token']
+        if not mgverify(os.environ['MAILGUN_API_KEY'], token, timestamp,
+                        signature):
+            request.setResponseCode(401)
+            returnValue(b'unauthorized')
+        # we need to get access to the data store, but the API-driven HTTP
+        # client here is not going to authenticate via a header _or_ a cookie.
+        # There should probably be a different public API for this.
+        request.requestHeaders.setRawHeaders(
+            b"X-Auth-Token", [b"synthetic-mailgun-token"]
+        )
+        session = yield self.procurer.procure_session(request)
+        ingestor = yield session.authorize(MessageIngestor)[MessageIngestor]
+        response = yield treq.get(url.encode("ascii"),
+                                  {"Accept": "message/rfc2822"},
+                                  auth=("api", os.environ['MAILGUN_API_KEY']))
+        body = yield treq.content(response)
+        body = json.loads(body)
+        ingestor.ingestMessage(body["body-mime"])
+        returnValue(b"OK")
+
 
 
     @authorized(
