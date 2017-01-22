@@ -188,6 +188,36 @@ class IngestionTask(object):
 
 
 @attr.s
+class ArchiveMessage(object):
+    """
+    A message loaded from an archive.
+    """
+    _messageRow = attr.ib()
+
+    def subject(self):
+        """
+        The subject of the message; unicode.
+        """
+        return self._messageRow['subject']
+
+    def body(self):
+        """
+        Extract a simple text part; unicode.
+        """
+        message = Parser().parsestr(self._messageRow["contents"]
+                                    .encode("charmap"))
+        for part in message.walk():
+            if part.get_content_type() == 'text/plain':
+                body = part.get_payload(decode=True).decode(
+                    part.get_content_charset()
+                )
+                break
+        else:
+            body = u'no body found'
+        return body
+
+
+@attr.s
 class MessageIngestor(object):
     _dataStore = attr.ib()
     _messageTable = attr.ib()
@@ -239,7 +269,7 @@ class MessageIngestor(object):
             returnValue(monthsMessagesRows)
         return monthsQuery
 
-    def oneMessageBody(self, listID, messageCounter):
+    def oneMessage(self, listID, messageCounter):
         @self._dataStore.sql
         @inlineCallbacks
         def query(txn):
@@ -249,14 +279,7 @@ class MessageIngestor(object):
                           m.select((m.c.list == listID) &
                                    (m.c.counter == messageCounter))))
                       .fetchall())[0]
-            message = Parser().parsestr(result["contents"])
-            for part in message.walk():
-                if part.get_content_type() == 'text/plain':
-                    body = part.get_payload(decode=True)
-                    break
-            else:
-                body = u'no body found'
-            returnValue(body)
+            returnValue(ArchiveMessage(result))
         return query
 
 
@@ -382,14 +405,22 @@ class ListsManagementSite(object):
     @authorized(
         page.routed(app.route("/list/<listID>/message/<messageCounter>"),
                     [tags.h1("List: ", slot("listID")),
-                     tags.pre(slot("messageText"))]),
+                     tags.h2("Subject: ", slot("subject")),
+                     tags.pre(
+                         style="white-space: pre-wrap; max-width: 120em;"
+                     )(slot("messageText"))]),
         ingestor=MessageIngestor,
     )
+    @inlineCallbacks
     def messageView(self, request, listID, messageCounter, ingestor):
         """
-        
+        Route to render a single message.
         """
-        return {
+        message = yield ingestor.oneMessage(listID, messageCounter)
+        if message is None:
+            returnValue(None)
+        returnValue({
             "listID": listID,
-            "messageText": ingestor.oneMessageBody(listID, messageCounter),
-        }
+            "subject": message.subject(),
+            "messageText": message.body(),
+        })
