@@ -370,7 +370,8 @@ class PreauthenticatableSessionProcurer(object):
 
 
     @inlineCallbacks
-    def procure_session(self, request):
+    def procure_session(self, request, force_insecure=False,
+                        always_create=True):
         """
         
         """
@@ -378,7 +379,9 @@ class PreauthenticatableSessionProcurer(object):
         if preauthenticated is None:
             # XXX we could move the mailgun token authentication here, and then
             # just have this behave as normal route authentication, maybe?
-            returnValue((yield self._realProcurer.procure_session(request)))
+            returnValue((yield self._realProcurer.procure_session(
+                request, force_insecure, always_create)
+            ))
         if preauthenticated in self._preauths:
             sessionID = self._preauths[preauthenticated]
             returnValue(
