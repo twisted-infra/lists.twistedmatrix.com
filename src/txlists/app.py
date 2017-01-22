@@ -469,7 +469,7 @@ class ListsManagementSite(object):
         self.log.info("procuring session")
         session = yield self.procurer.procure_session(request)
         self.log.info("authorizing ingestor")
-        ingestor = yield session.authorize(MessageIngestor)[MessageIngestor]
+        ingestor = yield session.authorize([MessageIngestor])[MessageIngestor]
         self.log.info("fetching message")
         response = yield treq.get(url.encode("ascii"),
                                   {"Accept": "message/rfc2822"},
