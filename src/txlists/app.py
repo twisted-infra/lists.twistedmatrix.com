@@ -382,6 +382,23 @@ class ListsManagementSite(object):
             "title": "Front Page"
         }
 
+    @page.routed(
+        app.route("/healthcheck"),
+        [
+            tags.h1("Health Check"),
+            tags.div("Up: yes"),
+            tags.div("MG API:", slot("mgapi"))
+        ]
+    )
+    @inlineCallbacks
+    def apicheck(self, request):
+        response = yield treq.get(
+            b"https://api.mailgun.net/v3/domains/lists.twistedmatrix.com",
+            auth=("api", os.environ['MAILGUN_API_KEY'])
+        )
+        treq.content(response)
+        returnValue({"mgapi": response.code})
+
     @app.route("/mailgun/webhook", methods=["POST"])
     @inlineCallbacks
     def webhook(self, request):
