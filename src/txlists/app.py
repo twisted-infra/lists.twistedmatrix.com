@@ -215,11 +215,7 @@ class MessageIngestor(object):
                 .fetchall()
             )[0][0]
             # start at the end month, go backwards
-            thisDateTime = (
-                datetime.datetime.utcfromtimestamp(startTime)
-                .replace(day=1, hour=0, minute=0, second=0)
-                - datetime.timedelta(seconds=1)
-            )
+            thisDateTime = datetime.datetime.utcfromtimestamp(startTime)
             for ignored in range(400):
                 thisTimestamp = (
                     thisDateTime - datetime.datetime.utcfromtimestamp(0)
