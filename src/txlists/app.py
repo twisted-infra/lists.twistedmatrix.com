@@ -23,9 +23,8 @@ from klein._session import requirer
 import treq
 
 from sqlalchemy import Column, String, Integer
-from sqlalchemy.sql.functions import max as Max
 from sqlalchemy.sql.expression import Select
-from sqlalchemy import desc
+from sqlalchemy import asc, desc, func
 
 import attr
 
@@ -252,36 +251,38 @@ class MessageIngestor(object):
         @inlineCallbacks
         def monthsQuery(txn):
             m = self._messageTable
-            l = m.c.list == listID
-            monthsMessagesRows = []
-            startTime = (
-                yield (yield txn.execute(Select([Max(m.c.received)], l)))
-                .fetchall()
-            )[0][0]
-            # start at the end month, go backwards
-            thisDateTime = datetime.datetime.utcfromtimestamp(startTime)
-            for ignored in range(400):
-                thisTimestamp = (
-                    thisDateTime - datetime.datetime.utcfromtimestamp(0)
-                ).total_seconds()
-                expr = Select(m.c, l & (m.c.received <= thisTimestamp))
-                expr = expr.order_by(desc(m.c.received))
-                expr = expr.limit(1)
-                oneNextMessages = (yield (yield txn.execute(
-                    expr
-                )).fetchall())
-                if oneNextMessages:
-                    monthsMessagesRows.append(oneNextMessages[0])
-                else:
-                    break
-                thisDateTime = (
-                    datetime.datetime.utcfromtimestamp(
-                        oneNextMessages[-1].received
-                    ).replace(day=1, hour=0, minute=0, second=0)
-                    - datetime.timedelta(seconds=1)
-                )
-            returnValue(monthsMessagesRows)
+
+            def asDatetime(column):
+                return func.datetime(column, "unixepoch")
+
+            orderedByReceived = (Select(m.c).order_by(asc(m.c.received)))
+
+            year = func.strftime(
+                "%Y",
+                asDatetime(orderedByReceived.c.received),
+            ).label("year")
+
+            month = func.strftime(
+                "%m",
+                asDatetime(orderedByReceived.c.received),
+            ).label("month")
+
+            query = Select(
+                orderedByReceived.c + [year, month],
+                orderedByReceived.c.list == listID,
+                from_obj=orderedByReceived,
+            ).group_by(
+                year, month,
+            ).order_by(
+                desc(year),
+                desc(month),
+            ).limit(100)
+
+            times = (yield (yield txn.execute(query)).fetchall())
+
+            returnValue(times)
         return monthsQuery
+
 
     def oneMessage(self, listID, messageCounter):
         @self._dataStore.sql
