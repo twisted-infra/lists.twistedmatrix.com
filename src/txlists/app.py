@@ -265,7 +265,7 @@ class MessageIngestor(object):
             yield txn.execute(m.insert().values(
                 list=listID,
                 counter=nextCounter,
-                sender=(getaddresses(m['From'])[0][1]),
+                sender=(getaddresses(msg['From'])[0][1]),
                 received=normalizeDate(msg['Date']),
                 contents=msg.as_string().decode('charmap'),
                 id=msg['message-id'].decode('charmap'),
