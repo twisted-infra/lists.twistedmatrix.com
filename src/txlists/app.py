@@ -236,6 +236,45 @@ class MessageIngestor(object):
     _messageTable = attr.ib()
     _replyTable = attr.ib()
 
+    def ingestMessage(self, messageBody):
+        msg = Parser().parsestr(messageBody)
+        tos = msg.get_all('to', [])
+        ccs = msg.get_all('cc', [])
+        from email.utils import getaddresses
+        recipients = getaddresses(tos + ccs)
+        for ignoredRealname, address in recipients:
+            if address.split("@")[-1] == u"lists.twistedmatrix.com":
+                listID = address.split("@")[0]
+                break
+        else:
+            raise NotImplementedError("no such list: " + repr(recipients))
+        m = self._messageTable
+        @self._dataStore.sql
+        @inlineCallbacks
+        def insertMessage(txn):
+            from sqlalchemy.sql.functions import max
+            # TODO: need to add a unique constraint on (list, counter) since
+            # this is not a concurrency-safe way to increment
+            nextCounter = (
+                yield (yield txn.execute(
+                    Select([max(m.c.counter)], m.c.list == listID))
+                ).fetchall()
+            )[0]
+            nextCounter = nextCounter if nextCounter is not None else 0
+            nextCounter += 1
+            yield txn.execute(m.insert().values(
+                list=listID,
+                counter=nextCounter,
+                sender=(getaddresses(m['From'])[0][1]),
+                received=normalizeDate(msg['Date']),
+                contents=msg.as_string().decode('charmap'),
+                id=msg['message-id'].decode('charmap'),
+                subject=msg['subject'].decode('charmap'),
+            ))
+        return insertMessage
+
+
+
     def someMessagesForList(self, listID):
         @self._dataStore.sql
         @inlineCallbacks
