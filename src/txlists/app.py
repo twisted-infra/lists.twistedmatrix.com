@@ -259,7 +259,7 @@ class MessageIngestor(object):
                 yield (yield txn.execute(
                     Select([max(m.c.counter)], m.c.list == listID))
                 ).fetchall()
-            )[0]
+            )[0][0]
             nextCounter = nextCounter if nextCounter is not None else 0
             nextCounter += 1
             yield txn.execute(m.insert().values(
