@@ -1,13 +1,15 @@
 
 import json
 import os
-
+import hashlib
+import hmac
 import html5lib
-from email.utils import parsedate_tz, mktime_tz, parseaddr
-from email.parser import Parser
 import mailbox
 
 import datetime
+
+from email.utils import parsedate_tz, mktime_tz, parseaddr, getaddresses
+from email.parser import Parser
 
 from twisted.web.template import tags, slot
 from twisted.internet.defer import inlineCallbacks, returnValue
@@ -24,6 +26,7 @@ import treq
 
 from sqlalchemy import Column, String, Integer
 from sqlalchemy.sql.expression import Select
+from sqlalchemy.sql.functions import Max
 from sqlalchemy import asc, desc, func
 
 import attr
@@ -40,7 +43,6 @@ page = Plating(
     )
 )
 
-import hashlib, hmac
 
 def mgverify(api_key, token, timestamp, signature):
     hmac_digest = hmac.new(key=api_key,
@@ -240,7 +242,6 @@ class MessageIngestor(object):
         msg = Parser().parsestr(messageBody)
         tos = msg.get_all('to', [])
         ccs = msg.get_all('cc', [])
-        from email.utils import getaddresses
         recipients = getaddresses(tos + ccs)
         for ignoredRealname, address in recipients:
             if address.split("@")[-1] == u"lists.twistedmatrix.com":
@@ -252,12 +253,11 @@ class MessageIngestor(object):
         @self._dataStore.sql
         @inlineCallbacks
         def insertMessage(txn):
-            from sqlalchemy.sql.functions import max
             # TODO: need to add a unique constraint on (list, counter) since
             # this is not a concurrency-safe way to increment
             nextCounter = (
                 yield (yield txn.execute(
-                    Select([max(m.c.counter)], m.c.list == listID))
+                    Select([Max(m.c.counter)], m.c.list == listID))
                 ).fetchall()
             )[0][0]
             nextCounter = nextCounter if nextCounter is not None else 0
