@@ -12,19 +12,20 @@ from email.utils import parsedate_tz, mktime_tz, parseaddr, getaddresses
 from email.parser import Parser
 
 from twisted.web.template import tags, slot
+from twisted.web.util import Redirect
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.python.filepath import FilePath
 from twisted.internet.task import cooperate
 from twisted.logger import Logger
 
-from klein import Klein, Plating, SessionProcurer
+from klein import Klein, Plating, SessionProcurer, form
 from klein.storage.sql import authorizer_for, open_session_store, tables
 from klein.interfaces import SessionMechanism
 from klein._session import requirer
 
 import treq
 
-from sqlalchemy import Column, String, Integer
+from sqlalchemy import Column, String, Integer, DateTime
 from sqlalchemy.sql.expression import Select
 from sqlalchemy.sql.functions import Max
 from sqlalchemy import asc, desc, func
@@ -373,6 +374,64 @@ def authorize_ingestor(metadata, datastore, session_store, transaction,
                            metadata.tables['message'],
                            metadata.tables['reply'])
 
+
+@attr.s
+class AddressVerifier(object):
+    """
+    Address verifier.
+    """
+    datastore = attr.ib()
+    metadata = attr.ib()
+    session = attr.ib()
+    verifiedEmails = attr.ib()
+
+    def completeVerification(self, token):
+        """
+        Complete an email address verification.
+        """
+        @self.datastore.sql
+        @inlineCallbacks
+        def storeSomeData(txn):
+            cv = self.metadata.tables["completed_verification"]
+            pv = self.metadata.tables["pending_verification"]
+            pending = (yield (yield pv.select(pv.c.token == token))
+                       .fetchall())[0]
+            yield pv.delete(pv.c.token == token)
+            yield cv.insert().values(email=pending["email"],
+                                     session=self.session.identifier)
+        return storeSomeData
+
+
+
+@authorizer_for(AddressVerifier,
+                tables(
+                    pending_verification=[
+                        Column("email", String(), index=True),
+                        Column("token", String(), index=True),
+                        Column("time", DateTime(), index=True),
+                    ],
+                    completed_verification=[
+                        Column("email", String(), index=True),
+                        Column("session", String(), index=True),
+                    ]
+                ))
+@inlineCallbacks
+def authorize_verifier(metadata, datastore, session_store, transaction,
+                       session):
+    """
+    Authorizer for?
+    """
+    pv = metadata.tables["pending_verification"]
+    rows = (yield (yield transaction.execute(
+        pv.select(pv.c.session == session.identifier)
+    )).fetchall())
+    returnValue(
+        AddressVerifier(datastore, metadata, session,
+                        [row["email"] for row in rows])
+    )
+
+
+
 @Plating.widget(
     tags=tags.transparent(
         tags.td(
@@ -527,6 +586,48 @@ class ListsManagementSite(object):
         self.log.info("OK!")
         returnValue(b"OK")
 
+
+    addressAdder = form(email=form.text()).authorized_using(authorized)
+    @authorized(
+        addressAdder.renderer(
+            page.routed(app.route("/manage")),
+            "/verify/start"
+        )
+    )
+    @inlineCallbacks
+    def manageSubscriptions(self, request):
+        """
+        Manage subscriptions.
+        """
+        yield
+
+
+    @authorized(
+        addressAdder.handler(
+            app.route("/verify/start", methods=["POST"])
+        ),
+    )
+    @inlineCallbacks
+    def startVerification(self, request, email):
+        """
+        Kick off an email address verification.
+        """
+        yield
+        returnValue(Redirect(b"/verify/waiting"))
+
+
+    @authorized(
+        page.routed(app.route("/verify/complete/<token>"),
+                    tags.h1("Verifying: ", slot("verified"))),
+        verifier=AddressVerifier
+    )
+    @inlineCallbacks
+    def completeVerification(self, request, token, verifier):
+        """
+        Complete verification.
+        """
+        yield verifier.completeVerification(token)
+        returnValue({"verified": "OK!"})
 
 
     @authorized(
