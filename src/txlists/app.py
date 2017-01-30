@@ -590,12 +590,15 @@ class ListsManagementSite(object):
     addressAdder = form(email=form.text()).authorized_using(authorized)
     @authorized(
         addressAdder.renderer(
-            page.routed(app.route("/manage")),
-            "/verify/start"
+            page.routed(app.route("/manage"),
+                        [tags.h1("Manage your Subscriptions"),
+                         tags.div("...")]),
+            "/verify/start",
+            argument="startVerificationForm"
         )
     )
     @inlineCallbacks
-    def manageSubscriptions(self, request):
+    def manageSubscriptions(self, request, startVerificationForm):
         """
         Manage subscriptions.
         """
