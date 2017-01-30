@@ -27,7 +27,7 @@ import treq
 
 from sqlalchemy import Column, String, Integer, DateTime
 from sqlalchemy.sql.expression import Select
-from sqlalchemy.sql.functions import Max
+from sqlalchemy.sql.functions import max as Max
 from sqlalchemy import asc, desc, func
 
 import attr
