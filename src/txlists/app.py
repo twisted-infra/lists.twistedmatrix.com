@@ -28,7 +28,7 @@ import treq
 from sqlalchemy import Column, String, Integer, DateTime
 from sqlalchemy.sql.expression import Select
 from sqlalchemy.sql.functions import max as Max
-from sqlalchemy import asc, desc, func
+from sqlalchemy import asc, desc, func, distinct
 
 import attr
 
@@ -232,12 +232,27 @@ class ArchiveMessage(object):
             body = u'no body found'
         return body
 
+def getrows(t, q):
+    return t.execute(q).addCallback(lambda r: r.fetchall())
 
 @attr.s
 class MessageIngestor(object):
     _dataStore = attr.ib()
     _messageTable = attr.ib()
     _replyTable = attr.ib()
+
+    def listNames(self):
+        """
+        @return: a L{Deferred} firing a L{list} of L{unicode} containing the
+            names of all the mailing lists available on this server.
+        """
+        @self._dataStore.sql
+        @inlineCallbacks
+        def t(txn):
+            m = self._messageTable
+            rows = yield getrows(txn, Select([distinct(m.c.list)]))
+            returnValue([row["list"] for row in rows])
+        return t
 
     def ingestMessage(self, messageBody):
         msg = Parser().parsestr(messageBody)
@@ -521,12 +536,22 @@ class ListsManagementSite(object):
     def authorized(self):
         return self.procurer
 
-    @page.routed(app.route("/"),
-                 tags.h1("Hello, world!"))
-    def root(self, request):
-        return {
-            "title": "Front Page"
-        }
+    @authorized(page.routed(
+        app.route("/"),
+        [tags.h1("List of Lists"),
+         tags.div(render="lists:list")(
+             tags.a(href=["/list/", slot("item"), "/archive/"])(
+                 slot("item")
+             )
+         )
+        ]
+    ), listLister=MessageIngestor)
+    @inlineCallbacks
+    def root(self, request, listLister):
+        returnValue({
+            "title": "Front Page",
+            "lists": (yield listLister.listNames())
+        })
 
     @page.routed(
         app.route("/healthcheck"),
