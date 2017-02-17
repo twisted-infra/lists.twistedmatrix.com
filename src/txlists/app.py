@@ -46,10 +46,25 @@ page = Plating(
 
 
 def mgverify(api_key, token, timestamp, signature):
+    """
+    Verify a mailgun webhook request.
+
+    @param api_key: The (secret) mailgun API key, used as the HMAC key.
+
+    @param token: The token sent along with the POST.
+
+    @param timestamp: The timestamp sent along with the POST.
+
+    @param signature: The signature sent with the POST, to verify.
+
+    @return: L{True} if the signature verifes, L{False} otherwise.
+    """
     hmac_digest = hmac.new(key=api_key,
                            msg='{}{}'.format(timestamp, token),
                            digestmod=hashlib.sha256).hexdigest()
     return hmac.compare_digest(unicode(signature), unicode(hmac_digest))
+
+
 
 def normalizeDate(string):
     """
