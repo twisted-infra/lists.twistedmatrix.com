@@ -85,7 +85,12 @@ globalIngestionList = {
 
 def extractPathInfo(fp):
     """
-    
+    Extract 3 bits of information from a path to a message archive HTML file.
+
+    @param fp: the path to the message.
+    @type fp: L{FilePath}
+
+    @return: 3-tuple of C{(message-number, email address of sender, timestamp)}
     """
     strumber = fp.basename().split(".")[0]
     number = int(strumber)
@@ -649,14 +654,16 @@ class ListsManagementSite(object):
         addressAdder.handler(
             app.route("/verify/start", methods=["POST"])
         ),
+        
     )
     @inlineCallbacks
     def startVerification(self, request, email):
         """
         Kick off an email address verification.
         """
-        yield
-        returnValue(Redirect(b"/verify/waiting"))
+        # Check rate-limiting.
+        yield 
+        returnValue(Redirect(b"/verify/waiting/" + email.decode("utf-8")))
 
 
     @authorized(
