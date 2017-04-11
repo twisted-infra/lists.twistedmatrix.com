@@ -32,9 +32,16 @@ docker push;
 
 # Create data volume containers if they don't already exist.
 docker rm -f lists.container || true;
+if hyper fip detach lists.container; then
+    echo successfully detached;
+fi;
+if hyper rm -f lists.container; then
+    echo successfully stopped;
+fi;
 hyper run -e MAILGUN_API_KEY -e NO_RENEW --detach --user="${TWISTED_USER_ID}" \
       --name lists.container --restart=always \
       -v lists-tls:/certificates" \
       -v lists-database:/database" \
       -v lists-messages:/legacy-mailman-archive" \
       -p 443:8443 infratwisted/lists;
+hyper fip attach lists.container 209.177.93.178;
