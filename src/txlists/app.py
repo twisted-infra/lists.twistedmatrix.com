@@ -2,6 +2,7 @@
 import json
 import os
 import hashlib
+import binascii
 import hmac
 import html5lib
 import mailbox
@@ -15,6 +16,7 @@ from twisted.web.template import tags, slot
 from twisted.web.util import Redirect
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.python.filepath import FilePath
+from twisted.python.compat import unicode
 from twisted.internet.task import cooperate
 from twisted.logger import Logger
 
@@ -420,6 +422,63 @@ class AddressVerifier(object):
     session = attr.ib()
     verifiedEmails = attr.ib()
 
+    def beginVerification(self, emailAddress):
+        """
+        Request an email be sent to the given email address containing a link
+        which, when clicked, will verify that the web session that clicked on
+        it has access to that email address and can perform actions on it.
+        """
+        from twisted.internet import reactor
+        @self.datastore.sql
+        @inlineCallbacks
+        def didWeSend(txn):
+            pv = self.metadata.tables["unclaimed_tokens"]
+            now = datetime.datetime.utcfromtimestamp(reactor.seconds())
+            rows = yield getrows(txn, pv.select(pv.c.email == emailAddress)
+                                 .with_for_update())
+            if rows:
+                row = rows[0]
+                token = row["token"]
+                then = row["time"]
+                messageShouldSendTime = then + datetime.timedelta(
+                    seconds=5 ** rows[0]["counter"]
+                )
+                delta = (messageShouldSendTime - now).total_seconds
+                if delta > 0:
+                    # It's too soon to initiate another verification.
+                    returnValue(False)
+                else:
+                    yield (pv.update(pv.c.email == emailAddress).values(
+                        time=now, counter=row["counter"] + 1
+                    ))
+            else:
+                token = binascii.hexlify(os.urandom(8))
+                yield txn.execute(pv.insert().values(
+                    email=emailAddress, token=token,
+                    time=now, counter=1,
+                ))
+            # n.b.: while actually calling the send API, the transaction is
+            # still open / uncommitted.
+            yield treq.post(
+                "https://api.mailgun.net/v3/lists.twistedmatrix.com/messages",
+                auth=("api", os.environ["MAILGUN_API_KEY"]),
+                data={
+                    "from": ("Verification Service "
+                             "<verification@lists.twistedmatrix.com>"),
+                    "to": [emailAddress],
+                    "subject": "verification message",
+                    "text":
+                    """
+                    Click the link below to verify your email address:
+
+                    https://lists.twistedmatrix.com/verify/complete/{token}
+                    """.format(token=token)
+                }
+            )
+            returnValue(True)
+        return didWeSend
+
+
     def completeVerification(self, token):
         """
         Complete an email address verification.
@@ -428,10 +487,9 @@ class AddressVerifier(object):
         @inlineCallbacks
         def storeSomeData(txn):
             cv = self.metadata.tables["completed_verification"]
-            pv = self.metadata.tables["pending_verification"]
-            pending = (yield (yield pv.select(pv.c.token == token))
-                       .fetchall())[0]
-            yield pv.delete(pv.c.token == token)
+            ut = self.metadata.tables["unclaimed_tokens"]
+            pending = (yield getrows(txn, ut.select(ut.c.token == token)))[0]
+            yield ut.delete(ut.c.token == token)
             yield cv.insert().values(email=pending["email"],
                                      session=self.session.identifier)
         return storeSomeData
@@ -440,15 +498,16 @@ class AddressVerifier(object):
 
 @authorizer_for(AddressVerifier,
                 tables(
-                    pending_verification=[
-                        Column("email", String(), index=True),
+                    unclaimed_tokens=[
+                        Column("email", String(), index=True, unique=True),
                         Column("token", String(), index=True),
                         Column("time", DateTime(), index=True),
+                        Column("counter", Integer(), index=True),
                     ],
                     completed_verification=[
                         Column("email", String(), index=True),
                         Column("session", String(), index=True),
-                    ]
+                    ],
                 ))
 @inlineCallbacks
 def authorize_verifier(metadata, datastore, session_store, transaction,
@@ -456,9 +515,9 @@ def authorize_verifier(metadata, datastore, session_store, transaction,
     """
     Authorizer for?
     """
-    pv = metadata.tables["pending_verification"]
+    ut = metadata.tables["unclaimed_tokens"]
     rows = (yield (yield transaction.execute(
-        pv.select(pv.c.session == session.identifier)
+        ut.select(ut.c.session == session.identifier)
     )).fetchall())
     returnValue(
         AddressVerifier(datastore, metadata, session,
@@ -654,15 +713,15 @@ class ListsManagementSite(object):
         addressAdder.handler(
             app.route("/verify/start", methods=["POST"])
         ),
-        
+        verifier=AddressVerifier,
     )
     @inlineCallbacks
-    def startVerification(self, request, email):
+    def startVerification(self, request, email, verifier):
         """
         Kick off an email address verification.
         """
         # Check rate-limiting.
-        yield 
+        yield verifier.beginVerification(email)
         returnValue(Redirect(b"/verify/waiting/" + email.decode("utf-8")))
 
 
