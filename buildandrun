@@ -46,4 +46,4 @@ hyper run -e MAILGUN_API_KEY -e NO_RENEW --detach \
       -v lists-database:/database \
       -v lists-messages:/legacy-mailman-archive \
       -p 443:8443 infratwisted/lists;
-Hyper fip attach 209.177.93.178 lists-container;
+hyper fip attach 209.177.93.178 lists-container;
