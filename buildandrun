@@ -22,39 +22,19 @@ tar cjf - -X .dockerignore . | \
     docker run --rm -i $CACHING_ARGS build | \
     (cd build/wheelhouse; tar xjf -);
 
-docker build -t lists.twistedmatrix.com .;
+docker build -t infratwisted/lists .;
 
-function dvc.volname () {
-    # Allow for setting VOLUME_PREFIX so that we can map host paths if we want,
-    # for development.
-    local VOLUME_NAME="$1"; shift;
-    echo -n "${VOLUME_PREFIX:+${VOLUME_PREFIX}/}${VOLUME_NAME}.volume";
-}
-
-function dvc.new () {
-    local VOLUME_NAME="$1"; shift;
-    docker create --name "${VOLUME_NAME}.dvc" \
-           --volume "$(dvc.volname ${VOLUME_NAME}):/data" hello-world;
-    docker run --rm -it --volumes-from="${VOLUME_NAME}.dvc" ubuntu bash -c \
-           "chown ${TWISTED_USER_ID} /data";
-    return "$?";
-}
-
-
-if dvc.new lists.tls; then
-    docker run --rm -it --user "${TWISTED_USER_ID}" \
-           --volumes-from "lists.tls.dvc" ubuntu bash -c \
-           "if [ ! -e /data/${TLS_HOSTNAME}.pem ]; then touch /data/${TLS_HOSTNAME}.pem; fi"
+if [ -n "${DOCKER_PUSH_PASSWORD}" ]; then
+    docker login -u "${DOCKER_PUSH_USER}" -p "${DOCKER_PUSH_PASSWORD}";
 fi;
 
-dvc.new lists.database || true;
-dvc.new lists.messages || true;
+docker push;
 
 # Create data volume containers if they don't already exist.
 docker rm -f lists.container || true;
-docker run -e MAILGUN_API_KEY -e NO_RENEW --detach --user="${TWISTED_USER_ID}" \
-       --name lists.container --restart=always \
-       -v "$(dvc.volname lists.tls):/certificates" \
-       -v "$(dvc.volname lists.database):/database" \
-       -v "$(dvc.volname lists.messages):/legacy-mailman-archive" \
-       -p 443:8443 lists.twistedmatrix.com;
+hyper run -e MAILGUN_API_KEY -e NO_RENEW --detach --user="${TWISTED_USER_ID}" \
+      --name lists.container --restart=always \
+      -v lists-tls:/certificates" \
+      -v lists-database:/database" \
+      -v lists-messages:/legacy-mailman-archive" \
+      -p 443:8443 infratwisted/lists;
