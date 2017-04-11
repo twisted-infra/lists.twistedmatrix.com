@@ -28,7 +28,7 @@ if [ -n "${DOCKER_PUSH_PASSWORD}" ]; then
     docker login -u "${DOCKER_PUSH_USER}" -p "${DOCKER_PUSH_PASSWORD}";
 fi;
 
-docker push;
+docker push infratwisted/lists;
 
 # Create data volume containers if they don't already exist.
 docker rm -f lists.container || true;
