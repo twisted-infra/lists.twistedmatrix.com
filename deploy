@@ -3,6 +3,9 @@
 # Set up an authenticated Hyper.SH environment for travis.
 
 curl -L "https://hyper-install.s3.amazonaws.com/hyper-linux-x86_64.tar.gz" | tar xz;
+mkdir bin;
+mv hyper bin/hyper;
+export PATH="$PATH:$(pwd)/bin";
 
 # Delegate to docker-building script.
 
