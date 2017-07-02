@@ -6,6 +6,7 @@ curl -L "https://hyper-install.s3.amazonaws.com/hyper-linux-x86_64.tar.gz" | tar
 mkdir bin;
 mv hyper bin/hyper;
 export PATH="$PATH:$(pwd)/bin";
+export DEPLOYING=true;
 
 # Delegate to docker-building script.
 

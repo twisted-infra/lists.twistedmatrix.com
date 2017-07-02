@@ -12,7 +12,7 @@ mkdir -p build/wheelhouse;
 
 CACHING_ARGS="$(
     if [ -n "${PIP_INDEX_URL}" ]; then
-        echo "-e=PIP_TRUSTED_HOST=10.200.10.1 -e=PIP_INDEX_URL=$(echo $PIP_INDEX_URL | sed s/127.0.0.1/10.200.10.1/g)"; # as per 'docker for mac' networking guide alias
+        echo "-e=PIP_TRUSTED_HOST=docker.for.mac.localhost -e=PIP_INDEX_URL=$(echo $PIP_INDEX_URL | sed s/127.0.0.1/docker.for.mac.localhost/g)"; # as per 'docker for mac' networking guide alias
     fi;
 )";
 
@@ -28,24 +28,41 @@ if [ -n "${DOCKER_PUSH_PASSWORD}" ]; then
     docker login -u "${DOCKER_PUSH_USER}" -p "${DOCKER_PUSH_PASSWORD}";
 fi;
 
-docker push infratwisted/lists;
+function dvc.volname () {
+    # Allow for setting VOLUME_PREFIX so that we can map host paths if we want,
+    # for development.
+    local VOLUME_NAME="$1"; shift;
+    echo -n "${VOLUME_PREFIX:+${VOLUME_PREFIX}/}${VOLUME_NAME}";
+}
 
-if hyper fip detach lists-container; then
-    echo successfully detached;
+if "${DEPLOYING}"; then
+    docker push infratwisted/lists; # XXX fixme: 'hyper load'?
+    if hyper fip detach lists-container; then
+        echo successfully detached;
+    else
+        echo detach failed;
+    fi;
+    RUNNER="hyper run --size=s4 ";
+    STOPPER="hyper rm -f ";
 else
-    echo detach failed;
+    RUNNER="docker run";
+    STOPPER="docker rm -f ";
 fi;
-if hyper rm -f lists-container; then
+
+if $STOPPER lists-container; then
     echo successfully stopped;
 else
     echo stop failed;
 fi;
-hyper run -e MAILGUN_API_KEY -e NO_RENEW --detach \
+
+$RUNNER -e MAILGUN_API_KEY -e NO_RENEW --detach \
       --name lists-container --restart=always \
-      -v lists-tls:/certificates \
-      -v lists-database:/database \
-      -v lists-messages:/legacy-mailman-archive \
+      -v "$(dvc.volname lists-tls)":/certificates \
+      -v "$(dvc.volname lists-database)":/database \
+      -v "$(dvc.volname lists-messages)":/legacy-mailman-archive \
       -p 443:8443 \
-      --size s3 \
       infratwisted/lists;
-hyper fip attach 209.177.93.178 lists-container;
+
+if "${DEPLOYING}"; then
+    hyper fip attach 209.177.93.178 lists-container;
+fi;

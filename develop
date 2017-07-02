@@ -14,6 +14,7 @@ NO_RENEW=yes \
         TWISTED_USER_ID="$(id -u)" \
         TLS_HOSTNAME="$(hostname -f)" \
         VOLUME_PREFIX="$PWD/volumes" \
+        DEPLOYING=false \
         bash -x buildandrun;
 
-docker logs -f lists.container;
+docker logs -f lists-container;
